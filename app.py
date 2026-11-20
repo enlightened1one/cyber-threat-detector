@@ -119,9 +119,12 @@ def create_app(test_config=None):
         db.create_all()
         if not User.query.filter_by(username=os.getenv("ADMIN_USERNAME", "admin")).first():
             admin = User(username=os.getenv("ADMIN_USERNAME", "admin"), role="administrator")
-            admin.set_password(os.getenv("ADMIN_PASSWORD", "change-me-now"))
+            initial_password = os.getenv("ADMIN_PASSWORD") or secrets.token_urlsafe(24)
+            admin.set_password(initial_password)
             db.session.add(admin)
             db.session.commit()
+            if not os.getenv("ADMIN_PASSWORD"):
+                print(f"Initial administrator password (save it now): {initial_password}")
     @app.context_processor
     def template_helpers():
         return {"now": lambda: datetime.now(timezone.utc), "from_json": json.loads}

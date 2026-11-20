@@ -15,7 +15,7 @@ python -m pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
 
-Edit `.env` and replace `SECRET_KEY` and `ADMIN_PASSWORD` before the first run. The administrator account is created only when the database is first initialized; subsequent credential changes do not rewrite an existing account password. Keep `.env`, the `instance/` directory, uploaded datasets and model artifacts private. Never use the example values in a deployed environment.
+Edit `.env` and replace `SECRET_KEY` and `ADMIN_PASSWORD` before the first run. If you skip `ADMIN_PASSWORD`, the app generates a random one-time initial password and prints it to the server console. The administrator account is created only when the database is first initialized; subsequent credential changes do not rewrite an existing account password. Keep `.env`, the `instance/` directory, uploaded datasets and model artifacts private. Never use the example values in a deployed environment.
 
 ```powershell
 python app.py
