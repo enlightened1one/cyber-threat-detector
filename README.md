@@ -36,6 +36,8 @@ SQLite is the default for a local demo. Set `DATABASE_URL` to a MySQL SQLAlchemy
 
 Malicious predictions create in-app alerts with an acknowledgement state. Every alert currently receives a default medium triage level; it is not a calibrated risk score. Analysts can filter the threat log by IP/protocol, class and review state, and attach investigation notes to detections.
 
+The overview dashboard computes its 14-day detection trend and prediction-class distribution from stored records; it does not use sample KPI values.
+
 The first release supports whichever labels are present in a trained dataset; it does not invent attack categories. A deployment should establish whether its data is binary or multiclass and curate labels accordingly. The dashboard counts every non-Normal class as a threat, so label the benign class `Normal` (or `Benign`) for correct KPI semantics.
 
 ## Roles

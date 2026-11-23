@@ -5,7 +5,7 @@ import io
 import json
 import os
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import joblib
@@ -220,11 +220,27 @@ def register_routes(app):
     @login_required
     def dashboard():
         total = Detection.query.count()
-        malicious = Detection.query.filter(Detection.result != "Normal").count()
+        malicious = Detection.query.filter(db.func.lower(Detection.result).notin_(["normal", "benign", "0"])).count()
+        class_rows = db.session.query(Detection.result, db.func.count(Detection.id)).group_by(Detection.result).order_by(db.func.count(Detection.id).desc()).all()
+        classes = [{"label": label, "count": count, "percent": round(count * 100 / total) if total else 0} for label, count in class_rows]
+        today = datetime.now(timezone.utc).date()
+        start = today - timedelta(days=13)
+        start_at = datetime.combine(start, datetime.min.time(), tzinfo=timezone.utc)
+        daily_rows = db.session.query(db.func.date(Detection.created_at), db.func.count(Detection.id)).filter(
+            Detection.created_at >= start_at).group_by(db.func.date(Detection.created_at)).all()
+        daily_counts = {str(day): count for day, count in daily_rows}
+        trend = []
+        for offset in range(14):
+            day = start + timedelta(days=offset)
+            count = daily_counts.get(day.isoformat(), 0)
+            trend.append({"label": day.strftime("%d"), "date": day.strftime("%b %d"), "count": count})
+        peak = max((day["count"] for day in trend), default=0)
+        for day in trend:
+            day["height"] = max(5, round(day["count"] * 100 / peak)) if peak else 5
         return render_template("dashboard.html", total=total, malicious=malicious,
             datasets=Dataset.query.order_by(Dataset.uploaded_at.desc()).limit(5).all(),
             detections=Detection.query.order_by(Detection.created_at.desc()).limit(8).all(),
-            active=ModelVersion.query.filter_by(active=True).first())
+            active=ModelVersion.query.filter_by(active=True).first(), classes=classes, trend=trend)
 
     @app.get("/datasets")
     @login_required

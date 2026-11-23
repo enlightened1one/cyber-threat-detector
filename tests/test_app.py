@@ -86,6 +86,10 @@ class ThreatAppTests(unittest.TestCase):
         preview = self.client.get(f"/datasets/{dataset_id}")
         self.assertEqual(preview.status_code, 200)
         self.assertIn(b"Record preview", preview.data)
+        dashboard = self.client.get("/")
+        self.assertEqual(dashboard.status_code, 200)
+        self.assertIn(b"Detection activity", dashboard.data)
+        self.assertIn(b"Class distribution", dashboard.data)
 
         response = self.client.post(f"/datasets/{dataset_id}/train", follow_redirects=True)
         self.assertEqual(response.status_code, 200)
