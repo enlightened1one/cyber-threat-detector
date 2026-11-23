@@ -1,1 +1,32 @@
-{% extends 'base.html' %}{% block title %}{{ item.name }}{% endblock %}{% block crumb %}<a href="{{ url_for('datasets') }}">Datasets</a> / {{ item.name }}{% endblock %}{% block content %}<div class="page-head"><div><p class="eyebrow">DATASET #{{ item.id }} · {{ item.status|upper }}</p><h1>{{ item.name }}</h1><p class="muted">{{ '{:,}'.format(item.records) }} records · Uploaded {{ item.uploaded_at.strftime('%B %d, %Y at %H:%M') }} · SHA-256 {{ item.checksum[:16] }}…</p></div>{% if current_user.role in ['administrator','analyst'] and label %}<form method="post" action="{{ url_for('train', dataset_id=item.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button primary">Train Random Forest →</button></form>{% endif %}</div><div class="section-heading"><div><h2>Record preview</h2><p class="muted">First {{ rows|length }} rows · {{ columns|length }} columns{% if label %} · Label: <code>{{ label }}</code>{% else %} · No recognized label column{% endif %}</p></div></div><div class="table-card preview-table"><table><thead><tr>{% for col in columns %}<th>{{ col|upper }}</th>{% endfor %}</tr></thead><tbody>{% for row in rows %}<tr>{% for col in columns %}<td>{{ row[col] }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>{% if not label %}<div class="notice"><span class="notice-icon">i</span><div><strong>Training needs labels</strong><p>This dataset has no recognized target column. Use it for prediction after activating an existing model.</p></div></div>{% endif %}{% endblock %}
+{% extends 'base.html' %}{% block title %}{{ item.name }}{% endblock %}{% block crumb %}<a
+    href="{{ url_for('datasets') }}">Datasets</a> / {{ item.name }}{% endblock %}{% block content %}<div
+    class="page-head">
+    <div>
+        <p class="eyebrow">DATASET #{{ item.id }} · {{ item.status|upper }}</p>
+        <h1>{{ item.name }}</h1>
+        <p class="muted">{{ '{:,}'.format(item.records) }} records · Uploaded {{ item.uploaded_at.strftime('%B %d, %Y at
+            %H:%M') }} · SHA-256 {{ item.checksum[:16] }}…</p>
+    </div>{% if current_user.role in ['administrator','analyst'] and label %}<form method="post"
+        action="{{ url_for('train', dataset_id=item.id) }}"><input type="hidden" name="csrf_token"
+            value="{{ csrf_token() }}"><button class="button primary">Train Random Forest →</button></form>{% endif %}
+</div>
+<div class="section-heading">
+    <div>
+        <h2>Record preview</h2>
+        <p class="muted">First {{ rows|length }} rows · {{ columns|length }} columns{% if label %} · Label:
+            <code>{{ label }}</code>{% else %} · No recognized label column{% endif %}</p>
+    </div>
+</div>
+<div class="table-card preview-table">
+    <table>
+        <thead>
+            <tr>{% for col in columns %}<th>{{ col|upper }}</th>{% endfor %}</tr>
+        </thead>
+        <tbody>{% for row in rows %}<tr>{% for col in columns %}<td>{{ row[col] }}</td>{% endfor %}</tr>{% endfor %}
+        </tbody>
+    </table>
+</div>{% if not label %}<div class="notice"><span class="notice-icon">i</span>
+    <div><strong>Training needs labels</strong>
+        <p>This dataset has no recognized target column. Use it for prediction after activating an existing model.</p>
+    </div>
+</div>{% endif %}{% endblock %}
