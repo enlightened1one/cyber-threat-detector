@@ -34,6 +34,8 @@ SQLite is the default for a local demo. Set `DATABASE_URL` to a MySQL SQLAlchemy
 5. An administrator reviews the evaluation and activates the model. Earlier model versions are retained; activation switches inference to one version.
 6. Upload feature-only CSV records in **Analyze traffic**. The app validates that all trained features exist, predicts the batch, stores results and exposes review status in **Threat log**.
 
+Malicious predictions create in-app alerts with an acknowledgement state. Every alert currently receives a default medium triage level; it is not a calibrated risk score. Analysts can filter the threat log by IP/protocol, class and review state, and attach investigation notes to detections.
+
 The first release supports whichever labels are present in a trained dataset; it does not invent attack categories. A deployment should establish whether its data is binary or multiclass and curate labels accordingly. The dashboard counts every non-Normal class as a threat, so label the benign class `Normal` (or `Benign`) for correct KPI semantics.
 
 ## Roles

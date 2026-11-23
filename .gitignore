@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 venv/
 instance/
+/work/
 *.db
 *.sqlite*
 .pytest_cache/

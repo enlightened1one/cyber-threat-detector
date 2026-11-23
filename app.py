@@ -79,6 +79,25 @@ class Detection(db.Model):
     review_status = db.Column(db.String(30), nullable=False, default="New")
 
 
+class Alert(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    detection_id = db.Column(db.Integer, db.ForeignKey("detection.id"), nullable=False, unique=True)
+    severity = db.Column(db.String(20), nullable=False, default="medium")
+    acknowledged_at = db.Column(db.DateTime)
+    acknowledged_by = db.Column(db.Integer, db.ForeignKey("user.id"))
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    detection = db.relationship("Detection")
+
+
+class AnalystNote(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    detection_id = db.Column(db.Integer, db.ForeignKey("detection.id"), nullable=False)
+    author_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    content = db.Column(db.String(2000), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    author = db.relationship("User")
+
+
 class AuditLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     actor_id = db.Column(db.Integer, db.ForeignKey("user.id"))
@@ -127,7 +146,8 @@ def create_app(test_config=None):
                 print(f"Initial administrator password (save it now): {initial_password}")
     @app.context_processor
     def template_helpers():
-        return {"now": lambda: datetime.now(timezone.utc), "from_json": json.loads}
+        unread_alerts = Alert.query.filter_by(acknowledged_at=None).count() if current_user.is_authenticated else 0
+        return {"now": lambda: datetime.now(timezone.utc), "from_json": json.loads, "unread_alerts": unread_alerts}
     app.jinja_env.filters["from_json"] = json.loads
     register_routes(app)
     return app
@@ -349,6 +369,10 @@ def register_routes(app):
                             protocol=(str(row[next(c for c in row.index if c.lower() == "protocol")])[:40]
                                 if any(c.lower() == "protocol" for c in row.index) else None), result=result, model_id=model.id))
                     db.session.add_all(batch)
+                    db.session.flush()
+                    for detection in batch:
+                        if detection.result.strip().lower() not in {"normal", "benign", "0"}:
+                            db.session.add(Alert(detection_id=detection.id, severity="medium"))
                     audit("batch_prediction", f"model:{model.id};rows:{len(batch)}")
                     db.session.commit()
                     malicious = sum(d.result.lower() not in {"normal", "benign", "0"} for d in batch)
@@ -362,7 +386,37 @@ def register_routes(app):
     @app.get("/threats")
     @login_required
     def threats():
-        return render_template("threats.html", detections=Detection.query.order_by(Detection.created_at.desc()).limit(500).all())
+        query = Detection.query
+        term = request.args.get("q", "").strip()
+        status = request.args.get("status", "")
+        classification = request.args.get("classification", "")
+        if term:
+            query = query.filter(db.or_(Detection.source_ip.contains(term), Detection.destination_ip.contains(term), Detection.protocol.contains(term)))
+        if status in {"New", "Reviewing", "Confirmed", "False Positive"}:
+            query = query.filter_by(review_status=status)
+        if classification:
+            query = query.filter(Detection.result.ilike(f"%{classification}%"))
+        detections = query.order_by(Detection.created_at.desc()).limit(500).all()
+        notes = AnalystNote.query.filter(AnalystNote.detection_id.in_([d.id for d in detections])).order_by(AnalystNote.created_at.asc()).all() if detections else []
+        notes_by_detection = {}
+        for note in notes:
+            notes_by_detection.setdefault(note.detection_id, []).append(note)
+        return render_template("threats.html", detections=detections, notes_by_detection=notes_by_detection,
+                               filters={"q": term, "status": status, "classification": classification})
+
+    @app.post("/threats/<int:detection_id>/notes")
+    @role_required("administrator", "analyst")
+    def add_note(detection_id):
+        db.get_or_404(Detection, detection_id)
+        content = request.form.get("content", "").strip()
+        if not content or len(content) > 2000:
+            flash("Investigation notes must contain 1–2,000 characters.", "error")
+            return redirect(url_for("threats"))
+        note = AnalystNote(detection_id=detection_id, author_id=current_user.id, content=content)
+        db.session.add(note)
+        audit("investigation_note_added", f"detection:{detection_id}")
+        db.session.commit()
+        return redirect(url_for("threats"))
 
     @app.post("/threats/<int:detection_id>/status")
     @role_required("administrator", "analyst")
@@ -393,6 +447,23 @@ def register_routes(app):
     @role_required("administrator")
     def audit_view():
         return render_template("audit.html", entries=AuditLog.query.order_by(AuditLog.created_at.desc()).limit(300).all())
+
+    @app.get("/alerts")
+    @login_required
+    def alerts():
+        items = Alert.query.join(Detection).order_by(Alert.acknowledged_at.is_(None).desc(), Alert.created_at.desc()).limit(500).all()
+        return render_template("alerts.html", alerts=items)
+
+    @app.post("/alerts/<int:alert_id>/acknowledge")
+    @role_required("administrator", "analyst")
+    def acknowledge_alert(alert_id):
+        alert = db.get_or_404(Alert, alert_id)
+        if alert.acknowledged_at is None:
+            alert.acknowledged_at = datetime.now(timezone.utc)
+            alert.acknowledged_by = current_user.id
+            audit("alert_acknowledged", f"alert:{alert.id}")
+            db.session.commit()
+        return redirect(url_for("alerts"))
 
     @app.route("/users", methods=["GET", "POST"])
     @role_required("administrator")
